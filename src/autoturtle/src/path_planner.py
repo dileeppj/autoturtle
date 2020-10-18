@@ -1,28 +1,12 @@
 #! /usr/bin/env python3
 
-'''
-make an openlist containing only the starting node
-make an empty closed list
-while (the destination node has not been reached):
-    consider the node with the lowest f score in the open list
-    if (this node is our destination node) :
-        we are finished 
-    if not:
-        put the current node in the closed list and look at all of its neighbors
-        for (each neighbor of the current node):
-            if (neighbor has lower g value than current and is in the closed list) :
-                replace the neighbor with the new, lower, g value 
-                current node is now the neighbor's parent            
-            else if (current g value is lower and this neighbor is in the open list ) :
-                replace the neighbor with the new, lower, g value 
-                change the neighbor's parent to our current node
-
-            else if this neighbor is not in both lists:
-                add it to the open list and set its g
-'''
 import math
 import sys
 import rospy
+import roslib
+from turtlesim.msg import Pose
+roslib.load_manifest('autoturtle')
+from autoturtle.srv import *
 
 class PathPlanner(object):
     def __init__(self, grid):
@@ -65,9 +49,9 @@ class PathPlanner(object):
         Type: List of Ints.
         :return: Found path or -1 if it fails.
         """
-        goal = [goal_pos[1], goal_pos[0]]
+        goal = [int(goal_pos[1]), int(goal_pos[0])]
         self.goal_node = goal
-        init = [start_pos[1],start_pos[0]]
+        init = [int(start_pos[1]),int(start_pos[0])]
         self.calc_heuristic()
         print(init, goal)
 
@@ -138,17 +122,27 @@ class PathPlanner(object):
         print( "full_path: ", full_path[:-1])
         for i in range(len(shortest_path)):
             print( shortest_path[i])
-        # return [tuple(init)]+full_path[:-1]
-        # return full_path[:-1]
-        return [list(ele) for ele in full_path] 
+        
+        return full_path[:-1]
 
+def handler_astar(req):
+    print(req.start, req.stop)
+    # print(type(req.start))
+    # print(type(req))
+    res = planner.a_star(req.start, req.stop)
+    path = [item for t in res for item in t]
+    print(type(path))
+    print(path)
+    return str(path)
+    # return str([list(ele) for ele in res]) 
+    # print(type(res))x
+    # return res
 
 if __name__ == '__main__':
-
     test_grid = [[0, 0, 0, 0, 0, 0, 0, 0],
                  [0, 0, 0, 0, 0, 0, 0, 0],
                  [0, 0, 0, 0, 0, 0, 0, 0],
-                 [1, 1, 1, 1, 1, 1, 1, 1],
+                 [1, 1, 1, 1, 1, 1, 0, 1],
                  [1, 0, 0, 1, 1, 0, 0, 1],
                  [1, 0, 0, 1, 1, 0, 0, 1],
                  [1, 0, 0, 1, 1, 0, 0, 1],
@@ -159,13 +153,10 @@ if __name__ == '__main__':
                  [1, 0, 0, 0, 0, 0, 0, 1],
                  [1, 1, 1, 1, 1, 1, 1, 1]]
 
-    test_start = [2,2]  # [x, y]
-    test_goal = [5,7]   # [x, y]
-
     planner = PathPlanner(test_grid)
-    res = planner.a_star(test_start, test_goal)
-    if res != -1:
-        print("found path")
-        print(res)
-    else:
-        print("no path")
+
+    rospy.init_node('path_planner')
+    # planner.a_star(test_start, test_goal)
+    s = rospy.Service('a_star', Path, handler=handler_astar)
+    print("[INFO] Ready to find Path (A-Star).")
+    rospy.spin()

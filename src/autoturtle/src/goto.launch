@@ -1,0 +1,3 @@
+<node pkg="rosservice" type="rosservice" name="reset" args="call /reset" />
+<node pkg="rosservice" type="rosservice" name="kill" args="call /kill turtle1" />
+<node pkg="rosservice" type="rosservice" name="spawn" args='spawn "x: 3.0 y: 3.0 theta: 0.0 name: turtle1"' />

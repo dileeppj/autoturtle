@@ -1,6 +1,10 @@
 #! /usr/bin/env python3
 
+import sys
 import rospy
+import roslib
+roslib.load_manifest('autoturtle')
+from autoturtle.srv import *
 from geometry_msgs.msg import Twist
 from turtlesim.msg import Pose
 from math import pow, sqrt, atan2
@@ -18,6 +22,7 @@ class TurtleBot(object):
         self.pos_sub  = rospy.Subscriber("/turtle1/pose", Pose, self.update_pose)
         self.cur_pose = Pose()
         self.rate     = rospy.Rate(10)
+
 
     def update_pose(self, data):
         """
@@ -78,12 +83,37 @@ class TurtleBot(object):
         vel_msg.angular.z = 0
         self.vel_pub.publish(vel_msg)
         # Spin the node
-        rospy.spin()
+        # rospy.spin()
+
+def path_client(x, y):
+    """
+    docstring
+    """
+    rospy.wait_for_service('a_star')
+    try:
+        a_star = rospy.ServiceProxy('a_star', Path)
+        res = a_star(x,y)
+        return res.path
+    except rospy.ServiceException as e:
+        print("[ERROR] Service call failed : {e}")
+
 
     
 if __name__ == "__main__":
+    xx = [3,3]
+    yy = [2,10]
     try:
         turtle1 = TurtleBot()
-        turtle1.move2goal(2,2,0.2)
+        res = path_client(xx,yy)
+        y = res.strip('[]')
+        z = y.replace(',',"")
+        z = list(zip(z.split()[0::2],z.split()[1::2]))
+        print(z)
+        for pos in z:
+            # print(pos)
+            print(f'x:{int(pos[0])},y:{int(pos[1])}')
+            turtle1.move2goal(int(pos[0]),int(pos[1]),0.2)
+            rospy.sleep(1)
+
     except rospy.ROSInternalException:
         pass

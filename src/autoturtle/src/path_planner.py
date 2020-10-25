@@ -4,20 +4,47 @@ import math
 import sys
 import rospy
 import roslib
+import numpy as np
 from turtlesim.msg import Pose
+from nav_msgs.msg import OccupancyGrid
 roslib.load_manifest('autoturtle')
 from autoturtle.srv import *
 
+
 class PathPlanner(object):
-    def __init__(self, grid):
+    def __init__(self):
         """
         List of lists that represents the occupancy map/grid. 
         List should only contain 0's for open nodes 
         and 1's for obstacles/walls.
         """
-        self.grid      = grid
+        # self.grid      = grid
         self.heuristic = None
         self.goal_node = None
+
+    def getMap(self):
+        """
+        docstring
+        """
+        rospy.Subscriber('map', OccupancyGrid, callback=self.mapCallback)
+
+    def mapCallback(self,mapData):
+        """
+        docstring
+        """
+        width = mapData.info.width
+        height = mapData.info.height
+        resolution = mapData.info.resolution
+        data = mapData.data
+        print(f'Width: {mapData.info.width}, Height: {mapData.info.height}')
+        print(f'Type of Data: {type(data)}')
+        print(f'Leng of Data: {len(data)}')
+        np_data = np.asarray(data)
+        np_data = np.reshape(np_data, (width,height))
+        np_data = np.where(np_data==-1,100,np_data)
+        np_data = np_data/100
+        np_data = np_data.astype(int)
+        self.grid = np_data.tolist()
 
     def calc_heuristic(self):
         """
@@ -36,8 +63,8 @@ class PathPlanner(object):
                 col_diff = abs(j - self.goal_node[1])
                 self.heuristic[i][j] = int(abs(row_diff - col_diff)+min(row_diff,col_diff)*2)
         print("Heuristic:")                
-        for i in range(len(self.heuristic)):
-            print(self.heuristic[i])
+        # for i in range(len(self.heuristic)):
+        #     print(self.heuristic[i])
 
     def a_star(self, start_pos, goal_pos):
         """
@@ -118,10 +145,10 @@ class PathPlanner(object):
             current_x = previous_x
             current_y = previous_y
         full_path.reverse()
-        print( "Found the goal in {} iterations.".format(count))
-        print( "full_path: ", full_path[:-1])
-        for i in range(len(shortest_path)):
-            print( shortest_path[i])
+        # print( "Found the goal in {} iterations.".format(count))
+        # print( "full_path: ", full_path[:-1])
+        # for i in range(len(shortest_path)):
+        #     print( shortest_path[i])
         
         return full_path[:-1]
 
@@ -130,31 +157,35 @@ def handler_astar(req):
     # print(type(req.start))
     # print(type(req))
     res = planner.a_star(req.start, req.stop)
-    path = [item for t in res for item in t]
-    print(type(path))
-    print(path)
-    return str(path)
+    if res != -1:
+        path = [item for t in res for item in t]
+        # print(type(path))
+        # print(path)
+        return str(path)
+    else:
+        print("No Path found")
+        return str(-1)
     # return str([list(ele) for ele in res]) 
     # print(type(res))x
     # return res
 
 if __name__ == '__main__':
-    test_grid = [[0, 0, 0, 0, 0, 0, 0, 0],
-                 [0, 0, 0, 0, 0, 0, 0, 0],
-                 [0, 0, 0, 0, 0, 0, 0, 0],
-                 [1, 1, 1, 1, 1, 1, 0, 1],
-                 [1, 0, 0, 1, 1, 0, 0, 1],
-                 [1, 0, 0, 1, 1, 0, 0, 1],
-                 [1, 0, 0, 1, 1, 0, 0, 1],
-                 [1, 0, 0, 0, 0, 0, 0, 1],
-                 [1, 0, 0, 0, 0, 0, 0, 1],
-                 [1, 0, 0, 0, 0, 0, 0, 1],
-                 [1, 0, 0, 0, 0, 0, 0, 1],
-                 [1, 0, 0, 0, 0, 0, 0, 1],
-                 [1, 1, 1, 1, 1, 1, 1, 1]]
+    # test_grid = [[0, 0, 0, 0, 0, 0, 0, 0],
+    #              [0, 0, 0, 0, 0, 0, 0, 0],
+    #              [0, 0, 0, 0, 0, 0, 0, 0],
+    #              [1, 1, 1, 1, 1, 1, 0, 1],
+    #              [1, 0, 0, 1, 1, 0, 0, 1],
+    #              [1, 0, 0, 1, 1, 0, 0, 1],
+    #              [1, 0, 0, 1, 1, 0, 0, 1],
+    #              [1, 0, 0, 0, 0, 0, 0, 1],
+    #              [1, 0, 0, 0, 0, 0, 0, 1],
+    #              [1, 0, 0, 0, 0, 0, 0, 1],
+    #              [1, 0, 0, 0, 0, 0, 0, 1],
+    #              [1, 0, 0, 0, 0, 0, 0, 1],
+    #              [1, 1, 1, 1, 1, 1, 1, 1]]
 
-    planner = PathPlanner(test_grid)
-
+    planner = PathPlanner()
+    planner.getMap()
     rospy.init_node('path_planner')
     # planner.a_star(test_start, test_goal)
     s = rospy.Service('a_star', Path, handler=handler_astar)

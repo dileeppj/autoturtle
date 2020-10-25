@@ -18,8 +18,8 @@ class TurtleBot(object):
         Init the control node for turtle1 and move it to the goal
         """
         rospy.init_node("turtlebot_controller")
-        self.vel_pub  = rospy.Publisher("/turtle1/cmd_vel", Twist, queue_size=10)
-        self.pos_sub  = rospy.Subscriber("/turtle1/pose", Pose, self.update_pose)
+        self.vel_pub  = rospy.Publisher("/cmd_vel", Twist, queue_size=10)
+        self.pos_sub  = rospy.Subscriber("/pose", Pose, self.update_pose)
         self.cur_pose = Pose()
         self.rate     = rospy.Rate(10)
 
@@ -100,20 +100,32 @@ def path_client(x, y):
 
     
 if __name__ == "__main__":
-    xx = [3,3]
-    yy = [2,10]
+    x1, y1 = input("Start => x | y \n").split()
+    x2, y2 = input("Goal  => x | y \n").split()
+    # xx = [226,190]
+    # yy = [200,170]
+    start_pos = [int(x1),int(y1)]
+    goal_pos  = [int(x2),int(y2)]
     try:
         turtle1 = TurtleBot()
-        res = path_client(xx,yy)
-        y = res.strip('[]')
-        z = y.replace(',',"")
-        z = list(zip(z.split()[0::2],z.split()[1::2]))
-        print(z)
-        for pos in z:
-            # print(pos)
-            print(f'x:{int(pos[0])},y:{int(pos[1])}')
-            turtle1.move2goal(int(pos[0]),int(pos[1]),0.2)
-            rospy.sleep(1)
+        res = path_client(start_pos,goal_pos)
+        if res != '-1':
+            y = res.strip('[]')
+            z = y.replace(',',"")
+            path = list(zip(z.split()[0::2],z.split()[1::2]))
+            print("Path :",end="")
+            for pos in path:
+                print(f' -> [x:{int(pos[0])},y:{int(pos[1])}]', end="")
+            i=1
+            print('-----------------------------------------------')
+            for pos in path:
+                print(f'Step #{i} -> {pos}')
+                # turtle1.move2goal(int(pos[0]),int(pos[1]),0.2)
+                i+=1
+                rospy.sleep(1)
+        else:
+            print("No Path found")
+        print("")
 
     except rospy.ROSInternalException:
         pass

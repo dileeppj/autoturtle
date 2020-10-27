@@ -1,51 +1,44 @@
 #! /usr/bin/env python3
 
+'''
+make an openlist containing only the starting node
+make an empty closed list
+while (the destination node has not been reached):
+    consider the node with the lowest f score in the open list
+    if (this node is our destination node) :
+        we are finished 
+    if not:
+        put the current node in the closed list and look at all of its neighbors
+        for (each neighbor of the current node):
+            if (neighbor has lower g value than current and is in the closed list) :
+                replace the neighbor with the new, lower, g value 
+                current node is now the neighbor's parent            
+            else if (current g value is lower and this neighbor is in the open list ) :
+                replace the neighbor with the new, lower, g value 
+                change the neighbor's parent to our current node
+
+            else if this neighbor is not in both lists:
+                add it to the open list and set its g
+'''
 import math
 import sys
-import rospy
-import roslib
-import numpy as np
 from PIL import Image
-from turtlesim.msg import Pose
-from nav_msgs.msg import OccupancyGrid
-roslib.load_manifest('autoturtle')
-from autoturtle.srv import *
-
+import numpy as np
+import rospy
 
 class PathPlanner(object):
-    def __init__(self):
+    def __init__(self, grid):
         """
-        List of lists that represents the occupancy map/grid. 
-        List should only contain 0's for open nodes 
-        and 1's for obstacles/walls.
+        Constructor of the PathPlanner Class.
+        :param grid: List of lists that represents the
+        occupancy map/grid. List should only contain 0's
+        for open nodes and 1's for obstacles/walls.
+        :param visual: Boolean to determine if Matplotlib
+        animation plays while path is found.
         """
-        # self.grid      = grid
+        self.grid      = grid
         self.heuristic = None
         self.goal_node = None
-
-    def getMap(self):
-        """
-        docstring
-        """
-        rospy.Subscriber('map', OccupancyGrid, callback=self.mapCallback)
-
-    def mapCallback(self,mapData):
-        """
-        docstring
-        """
-        width = mapData.info.width
-        height = mapData.info.height
-        resolution = mapData.info.resolution
-        data = mapData.data
-        print(f'Width: {mapData.info.width}, Height: {mapData.info.height}')
-        print(f'Type of Data: {type(data)}')
-        print(f'Leng of Data: {len(data)}')
-        np_data = np.asarray(data)
-        np_data = np.reshape(np_data, (width,height))
-        np_data = np.where(np_data==-1,100,np_data)
-        np_data = np_data/100
-        np_data = np_data.astype(int)
-        self.grid = np_data.tolist()
 
     def calc_heuristic(self):
         """
@@ -53,6 +46,7 @@ class PathPlanner(object):
         of the occupancy map, then calculate the cost from the
         goal node to every other node on the map and update the
         class member variable self.heuristic.
+        :return: None.
         """
         row = len(self.grid)
         col = len(self.grid[0])
@@ -63,7 +57,7 @@ class PathPlanner(object):
                 row_diff = abs(i - self.goal_node[0])
                 col_diff = abs(j - self.goal_node[1])
                 self.heuristic[i][j] = int(abs(row_diff - col_diff)+min(row_diff,col_diff)*2)
-        # print("Heuristic:")                
+        print("Heuristic:")                
         # for i in range(len(self.heuristic)):
         #     print(self.heuristic[i])
 
@@ -77,16 +71,16 @@ class PathPlanner(object):
         Type: List of Ints.
         :return: Found path or -1 if it fails.
         """
-        goal = [int(goal_pos[1]), int(goal_pos[0])]
+        goal = [goal_pos[1], goal_pos[0]]
         self.goal_node = goal
-        init = [int(start_pos[1]),int(start_pos[0])]
+        init = [start_pos[1],start_pos[0]]
         self.calc_heuristic()
         print(init, goal)
 
         delta = [[-1, 0],  # go up
-                 [0 ,-1],  # go left
-                 [1 , 0],  # go down
-                 [0 , 1]]  # go right
+            [0, -1],  # go left
+            [1, 0],  # go down
+            [0, 1]]  # go right
         delta_name = ['^ ', '< ', 'v ', '> ']
 
         closed = [[0 for col in range(len(self.grid[0]))] for row in range(len(self.grid))]
@@ -143,20 +137,16 @@ class PathPlanner(object):
         while current_x != init[0] or current_y != init[1]:
             previous_x = current_x - delta[delta_tracker[current_x][current_y]][0]
             previous_y = current_y - delta[delta_tracker[current_x][current_y]][1]
-            shortest_path[previous_x][previous_y] = 150
+            shortest_path[previous_x][previous_y] = 200
             full_path.append((current_x, current_y))
             current_x = previous_x
             current_y = previous_y
-        shortest_path[start_x][start_y] = 200
+        shortest_path[start_x][start_y] = 255
         full_path.reverse()
-        # print( "Found the goal in {} iterations.".format(count))
-        # print( "full_path: ", full_path[:-1])
-        # for i in range(len(shortest_path)):
-        #     print( shortest_path[i])
-        # data = np.array(shortest_path)
-        # rescaled = (255.0 / data.max() * (data - data.min())).astype(np.uint8)
-        # im = Image.fromarray(rescaled)
-        # im.save('path.png')
+        print( "Found the goal in {} iterations.".format(count))
+        print( "full_path: ", full_path[:-1])
+        for i in range(len(shortest_path)):
+            print( shortest_path[i])
         path = np.array(shortest_path)
         data = np.array(self.grid)
         # data[data<0]=1
@@ -166,30 +156,26 @@ class PathPlanner(object):
         im_path = Image.fromarray(r_path)
         im_data.paste(im_path, (0, 0), im_path)
         im_data.save('data.png')
-        return full_path[:-1]
+            
 
-def handler_astar(req):
-    print(req.start, req.stop)
-    # print(type(req.start))
-    # print(type(req))
-    res = planner.a_star(req.start, req.stop)
-    if res != -1:
-        path = [item for t in res for item in t]
-        # print(type(path))
-        # print(path)
-        return str(path)
-    else:
-        print("No Path found")
-        return str(-1)
-    # return str([list(ele) for ele in res]) 
-    # print(type(res))x
-    # return res
+        return init, full_path[:-1]
+
 
 if __name__ == '__main__':
-    planner = PathPlanner()
-    planner.getMap()
-    rospy.init_node('path_planner')
-    # planner.a_star(test_start, test_goal)
-    s = rospy.Service('a_star', Path, handler=handler_astar)
-    print("[INFO] Ready to find Path (A-Star).")
-    rospy.spin()
+    test_grid = [[0, 0, 0, 0, 0, 0],
+                 [0, 1, 1, 1, 1, 0],
+                 [0, 1, 0, 0, 0, 0],
+                 [0, 1, 0, 0, 0, 1],
+                 [0, 1, 0, 0, 0, 0],
+                 [0, 0, 0, 0, 0, 0],
+                 [0, 1, 0, 1, 0, 1],
+                 [0, 1, 0, 0, 0, 0]]
+    test_start = [0, 0]  # [x, y]
+    test_goal = [2,2]   # [x, y]
+
+    planner = PathPlanner(test_grid)
+
+    if planner.a_star(test_start, test_goal) != -1:
+        print("found path")
+    else:
+        print("no path")
